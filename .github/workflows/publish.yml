@@ -1,4 +1,4 @@
-name: Build and publish MiMo stream fix
+name: Build and publish MiMo toolstream fixes
 on:
   push:
     branches: [main]
@@ -25,9 +25,12 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Build
-        run: docker build --platform linux/amd64 -t ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix .
-      - name: Verify actual installed parser
+        run: docker build --platform linux/amd64 -t ghcr.io/phiephiephien/sglang-mimo:20260928-toolstream-fix .
+      - name: Verify parser and SSE behavior
         run: |
-          docker run --rm --entrypoint python3 -v "$PWD/test_streaming.py:/tmp/test_streaming.py:ro" ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix /tmp/test_streaming.py
+          docker run --rm --entrypoint python3 -v "$PWD/test_streaming.py:/tmp/test_streaming.py:ro" ghcr.io/phiephiephien/sglang-mimo:20260928-toolstream-fix /tmp/test_streaming.py
       - name: Publish
-        run: docker push ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix
+        run: |
+          docker push ghcr.io/phiephiephien/sglang-mimo:20260928-toolstream-fix
+          docker tag ghcr.io/phiephiephien/sglang-mimo:20260928-toolstream-fix ghcr.io/phiephiephien/sglang-mimo:latest
+          docker push ghcr.io/phiephiephien/sglang-mimo:latest

@@ -21,3 +21,31 @@ detector = MiMoDetector()
 assert detector.parse_streaming_increment('text <tool', [tool]).normal_text == 'text '
 assert detector.parse_streaming_increment('box>', [tool]).normal_text == '<toolbox>'
 print('PASS: all opening-token split positions, repeated calls, trailing text, false prefix')
+
+# Validate emitted SSE, including metadata that must never be suppressed.
+import json
+from sglang.srt.entrypoints.openai.sse_utils import build_sse_content
+
+base = dict(chunk_id='test', created=1, model='test', index=0)
+assert build_sse_content(**base, content='') == ''
+for extra, section, key, expected in [
+    ({'role': 'assistant'}, 'delta', 'role', 'assistant'),
+    ({'reasoning_content': 'thinking'}, 'delta', 'reasoning_content', 'thinking'),
+    ({'reasoning_content': ''}, 'delta', 'reasoning_content', ''),
+    ({'finish_reason': 'tool_calls'}, 'choice', 'finish_reason', 'tool_calls'),
+    ({'finish_reason': 'stop'}, 'choice', 'finish_reason', 'stop'),
+    ({'logprobs': {}}, 'choice', 'logprobs', {}),
+    ({'usage': {}}, 'root', 'usage', {}),
+    ({'matched_stop': 0}, 'choice', 'matched_stop', 0),
+    ({'matched_stop': ''}, 'choice', 'matched_stop', ''),
+]:
+    event = build_sse_content(**base, content='', **extra)
+    assert event.startswith('data: ') and event.endswith('\n\n'), extra
+    payload = json.loads(event[6:])
+    target = payload if section == 'root' else payload['choices'][0]
+    if section == 'delta':
+        target = target['delta']
+    assert target[key] == expected, extra
+for content in (None, 'hello', ' '):
+    assert build_sse_content(**base, content=content).startswith('data: ')
+print('PASS: empty-content SSE suppression and role/reasoning/finish/logprobs/usage/matched_stop preservation')
