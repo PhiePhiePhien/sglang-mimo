@@ -1,0 +1,33 @@
+name: Build and publish MiMo stream fix
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free runner disk for CUDA image
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+          docker system prune -af
+          df -h /
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Build
+        run: docker build --platform linux/amd64 -t ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix .
+      - name: Verify actual installed parser
+        run: |
+          docker run --rm --entrypoint python3 -v "$PWD/test_streaming.py:/tmp/test_streaming.py:ro" ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix /tmp/test_streaming.py
+      - name: Publish
+        run: docker push ghcr.io/phiephiephien/sglang-mimo:20260928-streamfix
