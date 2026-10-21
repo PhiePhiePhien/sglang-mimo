@@ -31,6 +31,14 @@ jobs:
           docker run --rm --entrypoint python3 -v "$PWD/test_streaming.py:/tmp/test_streaming.py:ro" ghcr.io/phiephiephien/sglang-mimo:20261021-pr41649 /tmp/test_streaming.py
       - name: Publish
         run: |
-          docker push ghcr.io/phiephiephien/sglang-mimo:20261021-pr41649
+          push_with_retry() {
+            for attempt in 1 2 3; do
+              if docker push "$1"; then return 0; fi
+              echo "Push attempt $attempt failed; retrying registry transfer"
+              sleep 5
+            done
+            return 1
+          }
+          push_with_retry ghcr.io/phiephiephien/sglang-mimo:20261021-pr41649
           docker tag ghcr.io/phiephiephien/sglang-mimo:20261021-pr41649 ghcr.io/phiephiephien/sglang-mimo:latest
-          docker push ghcr.io/phiephiephien/sglang-mimo:latest
+          push_with_retry ghcr.io/phiephiephien/sglang-mimo:latest
