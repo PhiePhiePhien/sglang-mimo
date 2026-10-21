@@ -1,0 +1,43 @@
+name: Delete superseded sglang-mimo images
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the verified PR 41649 image and delete older versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          base = 'https://api.github.com/users/PhiePhiePhien/packages/container/sglang-mimo/versions'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+          def request(url, method='GET'):
+              req = urllib.request.Request(url, headers=headers, method=method)
+              with urllib.request.urlopen(req) as response:
+                  body = response.read()
+                  return json.loads(body) if body else None
+          versions = []
+          page = 1
+          while True:
+              batch = request(base + f'?per_page=100&page={page}')
+              versions.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          keep = [v for v in versions if '20261021-pr41649' in v['metadata']['container']['tags']]
+          assert len(keep) == 1, 'New image must exist before any deletion'
+          assert 'latest' in keep[0]['metadata']['container']['tags'], 'latest must point to the new image'
+          print('KEEP', keep[0]['id'], keep[0]['name'], keep[0]['metadata']['container']['tags'])
+          for v in versions:
+              if v['id'] != keep[0]['id']:
+                  print('DELETE', v['id'], v['name'], v['metadata']['container']['tags'])
+                  request(base + '/' + str(v['id']), 'DELETE')
+          remaining = request(base + '?per_page=100')
+          assert len(remaining) == 1 and remaining[0]['id'] == keep[0]['id'], remaining
+          print('PASS: only the new PR 41649 image remains')
+          PY
