@@ -16,7 +16,7 @@ GPU inference and end-to-end Open WebUI/GPUStack streaming have not been tested.
 ghcr.io/phiephiephien/sglang-mimo:20261021-pr41649
 ```
 
-`latest` points to the same build. The older `20260928-streamfix` tag remains available with only the MiMo fix.
+`latest` points to the same build. Superseded image versions are removed after successful publication and verification of the replacement.
 Select the new image in your SGLang backend version and retain your existing entrypoint/model settings.
 
 ## Local build and verification
