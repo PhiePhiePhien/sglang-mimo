@@ -49,3 +49,35 @@ for extra, section, key, expected in [
 for content in (None, 'hello', ' '):
     assert build_sse_content(**base, content=content).startswith('data: ')
 print('PASS: empty-content SSE suppression and role/reasoning/finish/logprobs/usage/matched_stop preservation')
+
+# PR #41649: test real parsing for nullable/union types, in both modes.
+from sglang.srt.function_call.mimo_detector import _get_param_type
+cases = [
+    (['string', 'null'], 'celsius', 'celsius'),
+    (['null', 'integer'], '7', 7),
+    (['integer', 'null'], '7', 7),
+    (['string', 'null'], 'null', None),
+    (['null'], 'fallback', 'fallback'),
+    ([], 'fallback', 'fallback'),
+    ('integer', '7', 7),
+    ('string', '7', '7'),
+]
+for schema_type, value, expected in cases:
+    tools = [Tool.model_validate({'type': 'function', 'function': {
+        'name': 'echo', 'parameters': {'type': 'object', 'properties': {
+            'text': {'type': schema_type}
+        }}
+    }})]
+    text = f'<tool_call><function=echo><parameter=text>{value}</parameter></function></tool_call>'
+    for streaming in (False, True):
+        detector = MiMoDetector()
+        if streaming:
+            calls = []
+            for character in text:
+                calls.extend(detector.parse_streaming_increment(character, tools).calls)
+        else:
+            calls = detector.detect_and_parse(text, tools).calls
+        assert len(calls) == 1, (schema_type, streaming)
+        actual = json.loads(calls[0].parameters)['text']
+        assert actual == expected and type(actual) is type(expected), (schema_type, streaming, actual)
+print('PASS: PR #41649 union/nullable/plain types in full and character-level streaming parsing')
